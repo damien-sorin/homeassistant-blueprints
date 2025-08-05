@@ -38,8 +38,8 @@ blueprint:
     power_value_off_max_input:
       name: Off State - Max Power Consumption   
       description: The max power consumption to assume the device is in 'off' state.
+      default: 0.1
       selector:
-        default: 0.1
         number:
           min: 0
           max: 3600
@@ -50,8 +50,8 @@ blueprint:
     power_value_idle_min_input:
       name: On State - Min Power Consumption   
       description: The min power consumption to assume the device is in 'on' but not 'running' state.
+      default: 0.2
       selector:
-        default: 0.2
         number:
           min: 0
           max: 3600
@@ -62,8 +62,8 @@ blueprint:
     power_value_idle_max_input:
       name: On State - Max Power Consumption   
       description: The max power consumption to assume the device is in 'on' but not 'running' state.
+      default: 4.0
       selector:
-        default: 4.0
         number:
           min: 0
           max: 3600
@@ -74,8 +74,8 @@ blueprint:
     power_value_running_min_input:
       name: Running State - Min Power Consumption   
       description: The max power consumption to assume the device is in 'running' state.
+      default: 30.0
       selector:
-        default: 30.0
         number:
           min: 0
           max: 3600
