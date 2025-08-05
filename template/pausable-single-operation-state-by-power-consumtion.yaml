@@ -5,7 +5,7 @@ blueprint:
     
     It assumes that the 'running' operation can be paused and resumed before regular finish.
   domain: template
-  source_url: https://github.com/damien-sorin/homeassistant-blueprints/template/operational-state-by-power-consumption.yaml
+  source_url: https://github.com/damien-sorin/homeassistant-blueprints/blob/main/template/pausable-single-operation-state-by-power-consumtion.yaml
   input:
 
     sensor_name_input:
