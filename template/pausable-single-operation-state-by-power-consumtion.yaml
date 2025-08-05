@@ -72,8 +72,6 @@ blueprint:
           mode: box
 
 variables:
-  sensor_name: !input sensor_name_input
-  sensor_unique_id: !input sensor_unique_id_input
   power_sensor: !input reference_power_consumption_entity_input
 
   power_value_off_max: !input power_value_off_max_input
