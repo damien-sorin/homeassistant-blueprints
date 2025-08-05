@@ -1,0 +1,179 @@
+blueprint:
+  name: Pausable Single Operation State by Power Consumption
+  description: |
+    Creates a sensor which holds an operational state based on a referenced power consumption entity.
+    
+    It assumes that the 'running' operation can be paused and resumed before regular finish.
+  domain: template
+  source_url: https://github.com/damien-sorin/homeassistant-blueprints/template/operational-state-by-power-consumption.yaml
+  input:
+
+    sensor_name_input:
+      name: Sensor Name
+      description: The name of the created sensor. The generated entity id is based on this name.
+      selector:
+        text:
+          prefix: 'name: '
+          multiline: false
+          multiple: false
+
+    sensor_unique_id_input:
+      name: Unique ID
+      description: The unique_id of the created sensor. The is useful when customization of the sensor (like custom icon) comes into place.
+      selector:
+        text:
+          prefix: 'unique_id: '
+          multiline: false
+          multiple: false
+
+    reference_power_consumption_entity_input:
+      name: Current Power Consumption Sensor
+      description: sensor entity delivering the current power consumption in Watt.
+      selector:
+        entity:
+          multiple: false
+          filter:
+            device_class: power
+
+    power_value_off_max_input:
+      name: Off State - Max Power Consumption   
+      description: The max power consumption to assume the device is in 'off' state.
+      selector:
+        default: 0.1
+        number:
+          min: 0
+          max: 3600
+          step: 0.1
+          unit_of_measurement: W
+          mode: box
+
+    power_value_idle_min_input:
+      name: On State - Min Power Consumption   
+      description: The min power consumption to assume the device is in 'on' but not 'running' state.
+      selector:
+        default: 0.2
+        number:
+          min: 0
+          max: 3600
+          step: 0.1
+          unit_of_measurement: W
+          mode: box
+
+    power_value_idle_max_input:
+      name: On State - Max Power Consumption   
+      description: The max power consumption to assume the device is in 'on' but not 'running' state.
+      selector:
+        default: 4.0
+        number:
+          min: 0
+          max: 3600
+          step: 0.1
+          unit_of_measurement: W
+          mode: box
+
+    power_value_running_min_input:
+      name: Running State - Min Power Consumption   
+      description: The max power consumption to assume the device is in 'running' state.
+      selector:
+        default: 30.0
+        number:
+          min: 0
+          max: 3600
+          step: 0.1
+          unit_of_measurement: W
+          mode: box
+
+variables:
+  sensor_name: !input sensor_name_input
+  sensor_unique_id: !input sensor_unique_id_input
+  power_sensor: !input reference_power_consumption_entity_input
+
+  power_value_off_max: !input power_value_off_max_input
+  power_value_idle_min: !input power_value_idle_min_input
+  power_value_idle_max: !input power_value_idle_max_input
+  power_value_runnin_min: !input power_value_running_min_input
+
+  state_unknown: 'unknown'
+  state_off: 'off'
+  state_on: 'on'
+  state_running: 'running'
+  state_finished_paused: 'finished/paused'
+  state_interrupted: 'interrupted by power supply'
+
+sensor:
+  name: sensor_name
+  unique_id: sensor_unique_id
+  availability: >
+    {{ states(power_sensor) not in ('unknown', 'unavailable') }}
+  state: >
+    {% set next_state = state_unknown %}
+
+    {% set power_sensor_state = states(power_sensor) %}
+    
+    {% if power_sensor_state | is_number %}
+
+      {% set current_power = power_sensor_state | float(0) %}
+
+      {% set current_state = this.state %}
+      {% if current_state in [None, '', 'unavailable'] %}
+          {% set current_state = state_unknown %}
+      {% endif %}
+
+      {% set next_state = current_state %}
+
+      {% if current_state == state_unknown %}
+
+        {% if current_power <= power_value_off_max %}
+          {% set next_state = state_off %}
+        {% elif current_power <= power_value_runnin_min %}
+          {% set next_state = state_on %}
+        {% else %}
+          {% set next_state = state_running %}
+        {% endif %}
+
+      {% elif current_state == state_off %}
+
+        {% if current_power > power_value_off_max %}
+          {% set next_state = state_on %}
+        {% endif %}
+
+      {% elif current_state == state_on %}
+
+        {% if current_power <= power_value_off_max %}
+          {% set next_state = state_off %}
+        {% elif current_power > power_value_runnin_min %}
+          {% set next_state = state_running %}
+        {% endif %}
+
+      {% elif current_state == state_running %}
+
+        {% if current_power <= power_value_off_max %}
+          {% set next_state = state_interrupted %}
+        {% elif current_power > power_value_idle_min and current_power <= power_value_idle_max %}
+          {% set next_state = state_finished_paused %}
+        {% endif %}
+      
+      {% elif current_state == state_finished_paused %}
+
+        {% if current_power <= power_value_off_max %}
+          {% set next_state = state_off %}
+        {% elif current_power > power_value_runnin_min %}
+          {% set next_state = state_running %}
+        {% endif %}
+
+      {% elif current_state == state_interrupted %}
+
+        {% if current_power <= power_value_off_max %}
+          {% set next_state = state_off %}
+        {% else %}
+          {% set next_state = state_on %}
+        {% endif %}
+      
+      {% endif %}
+    
+    {% endif %}
+
+    {{ next_state }}
+  # delay_on: not_used
+  # delay_off: not_used
+  # auto_off: not_used
