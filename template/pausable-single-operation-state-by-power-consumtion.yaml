@@ -1,30 +1,18 @@
 blueprint:
   name: Pausable Single Operation State by Power Consumption
   description: |
-    Creates a sensor which holds an operational state based on a referenced power consumption entity.
+    
+    # Pausable Single Operation State by Power Consumption
+
+    A template sensor which holds an operational state based on a referenced power consumption entity.
     
     It assumes that the 'running' operation can be paused and resumed before regular finish.
+
+    The states are 'off', 'on', 'running', 'finish/paused', and 'interrupted by power supply'.
+
   domain: template
   source_url: https://github.com/damien-sorin/homeassistant-blueprints/blob/main/template/pausable-single-operation-state-by-power-consumtion.yaml
   input:
-
-    sensor_name_input:
-      name: Sensor Name
-      description: The name of the created sensor. The generated entity id is based on this name.
-      selector:
-        text:
-          prefix: 'name: '
-          multiline: false
-          multiple: false
-
-    sensor_unique_id_input:
-      name: Unique ID
-      description: The unique_id of the created sensor. The is useful when customization of the sensor (like custom icon) comes into place.
-      selector:
-        text:
-          prefix: 'unique_id: '
-          multiline: false
-          multiple: false
 
     reference_power_consumption_entity_input:
       name: Current Power Consumption Sensor
@@ -101,10 +89,11 @@ variables:
   state_interrupted: 'interrupted by power supply'
 
 sensor:
-  name: sensor_name
-  unique_id: sensor_unique_id
   availability: >
     {{ states(power_sensor) not in ('unknown', 'unavailable') }}
+  # delay_on: not_used
+  # delay_off: not_used
+  # auto_off: not_used
   state: >
     {% set next_state = state_unknown %}
 
@@ -174,6 +163,3 @@ sensor:
     {% endif %}
 
     {{ next_state }}
-  # delay_on: not_used
-  # delay_off: not_used
-  # auto_off: not_used
