@@ -8,17 +8,17 @@ blueprint:
     
     It assumes that the 'running' operation can be paused and resumed before regular finish.
 
-    The states are 'off', 'on', 'running', 'finish/paused', and 'interrupted by power supply'.
+    The states are 'off', 'on', 'running', 'paused or finished', 'finished', and 'interrupted by power supply'.
     
     ## More Info
 
-    ℹ️ Version 2025.12.1
+    ℹ️ Version 2025.12.2
 
   domain: template
   source_url: https://github.com/damien-sorin/homeassistant-blueprints/blob/main/template/pausable-single-operation-state-by-power-consumption.yaml
   input:
 
-    reference_power_consumption_entity_input:
+    reference_power_consumption_entity:
       name: Current Power Consumption Sensor
       description: sensor entity delivering the current power consumption in Watt.
       selector:
@@ -27,7 +27,7 @@ blueprint:
           filter:
             device_class: power
 
-    power_value_off_upper_input:
+    power_value_off_upper:
       name: Off State - Upper Bound Power Consumption   
       description: The highest power consumption to assume the device is in 'off' state.
       default: 0.1
@@ -39,7 +39,7 @@ blueprint:
           unit_of_measurement: W
           mode: box
 
-    power_value_idle_lower_input:
+    power_value_idle_lower:
       name: On State - Lower Bound Power Consumption   
       description: The lowest power consumption value to assume the device is in 'on' state.
       default: 0.2
@@ -51,7 +51,7 @@ blueprint:
           unit_of_measurement: W
           mode: box
 
-    power_value_idle_upper_input:
+    power_value_idle_upper:
       name: On State - Upper Bound Power Consumption   
       description: The highest power consumption value to assume the device is in 'on' state.
       default: 4.0
@@ -63,7 +63,7 @@ blueprint:
           unit_of_measurement: W
           mode: box
 
-    power_value_running_lower_input:
+    power_value_running_lower:
       name: Running State - Lower Bound Power Consumption   
       description: The lowest power consumption value to assume the device is in 'running' state.
       default: 30.0
@@ -75,31 +75,43 @@ blueprint:
           unit_of_measurement: W
           mode: box
 
+    paused_to_finished_delay:
+      name: Pause Duration Threshold
+      description: Time in seconds to consider the device as finished instead of paused.
+      default: 300
+      selector:
+        number:
+          min: 10
+          max: 3600
+          step: 1
+          unit_of_measurement: s
+          mode: box
+
 variables:
-  power_sensor: !input reference_power_consumption_entity_input
+  _power_sensor: !input reference_power_consumption_entity
 
-  power_value_off_upper: !input power_value_off_upper_input
-  power_value_idle_lower: !input power_value_idle_lower_input
-  power_value_idle_upper: !input power_value_idle_upper_input
-  power_value_running_lower: !input power_value_running_lower_input
+  _power_value_off_upper: !input power_value_off_upper
+  _power_value_idle_lower: !input power_value_idle_lower
+  _power_value_idle_upper: !input power_value_idle_upper
+  _power_value_running_lower: !input power_value_running_lower
 
-  state_unknown: 'unknown'
-  state_off: 'off'
-  state_on: 'on'
-  state_running: 'running'
-  state_finished_paused: 'finished/paused'
-  state_interrupted: 'interrupted by power supply'
+  _state_unknown: 'unknown'
+  _state_off: 'off'
+  _state_on: 'on'
+  _state_running: 'running'
+  _state_paused_or_finished: 'paused or finished'
+  _state_finished: 'finished'
+  _state_interrupted: 'interrupted by power supply'
+  
+  _paused_to_finished_delay: !input paused_to_finished_delay
 
 sensor:
   availability: >
-    {{ states(power_sensor) not in ('unknown', 'unavailable') }}
-  # delay_on: not_used
-  # delay_off: not_used
-  # auto_off: not_used
+    {{ states(_power_sensor) not in ('unknown', 'unavailable') }}
   state: >
-    {% set next_state = state_unknown %}
+    {% set next_state = _state_unknown %}
 
-    {% set power_sensor_state = states(power_sensor) %}
+    {% set power_sensor_state = states(_power_sensor) %}
     
     {% if power_sensor_state | is_number %}
 
@@ -107,59 +119,78 @@ sensor:
 
       {% set current_state = this.state %}
       {% if current_state in [None, '', 'unavailable'] %}
-          {% set current_state = state_unknown %}
+          {% set current_state = _state_unknown %}
       {% endif %}
 
       {% set next_state = current_state %}
 
-      {% if current_state == state_unknown %}
+      {% if current_state == _state_unknown %}
 
-        {% if current_power < power_value_idle_lower %}
-          {% set next_state = state_off %}
-        {% elif current_power < power_value_running_lower %}
-          {% set next_state = state_on %}
+        {% if current_power < _power_value_idle_lower %}
+          {% set next_state = _state_off %}
+        {% elif current_power < _power_value_running_lower %}
+          {% set next_state = _state_on %}
         {% else %}
-          {% set next_state = state_running %}
+          {% set next_state = _state_running %}
         {% endif %}
 
-      {% elif current_state == state_off %}
+      {% elif current_state == _state_off %}
 
-        {% if current_power >= power_value_idle_lower %}
-          {% set next_state = state_on %}
+        {% if current_power >= _power_value_idle_lower %}
+          {% set next_state = _state_on %}
         {% endif %}
 
-      {% elif current_state == state_on %}
+      {% elif current_state == _state_on %}
 
-        {% if current_power <= power_value_off_upper %}
-          {% set next_state = state_off %}
-        {% elif current_power >= power_value_running_lower %}
-          {% set next_state = state_running %}
+        {% if current_power <= _power_value_off_upper %}
+          {% set next_state = _state_off %}
+        {% elif current_power >= _power_value_running_lower %}
+          {% set next_state = _state_running %}
         {% endif %}
 
-      {% elif current_state == state_running %}
+      {% elif current_state == _state_running %}
 
-        {% if current_power <= power_value_off_upper %}
-          {% set next_state = state_interrupted %}
-        {% elif current_power <= power_value_idle_upper %}
-          {% set next_state = state_finished_paused %}
+        {% if current_power <= _power_value_off_upper %}
+          {% set next_state = _state_interrupted %}
+        {% elif current_power <= _power_value_idle_upper %}
+          {% set next_state = _state_paused_or_finished %}
         {% endif %}
       
-      {% elif current_state == state_finished_paused %}
+      {% elif current_state == _state_paused_or_finished %}
 
-        {% if current_power <= power_value_off_upper %}
-          {% set next_state = state_off %}
-        {% elif current_power >= power_value_running_lower %}
-          {% set next_state = state_running %}
+        {% if current_power <= _power_value_off_upper %}
+          {% set next_state = _state_finished %}
+        {% elif current_power >= _power_value_running_lower %}
+          {% set next_state = _state_running %}
         {% endif %}
 
-      {% elif current_state == state_interrupted %}
+        {% if next_state == current_state %}
 
-        {% if current_power < power_value_idle_lower %}
-          {% set next_state = state_off %}
-        {% elif current_power < power_value_running_lower %}
-          {% set next_state = state_on %}
+          {% set last_changed = as_timestamp(this.last_changed, 0) %}
+          {% set paused_or_finished_duration = now().timestamp() - last_changed %}
+
+          {% if paused_or_finished_duration > _paused_to_finished_delay %}
+            {% set next_state = _state_finished %}
+          {% endif %}
+
+        {% endif %}
+
+      {% elif current_state == _state_finished %}
+
+        {% if current_power <= _power_value_off_upper %}
+          {% set next_state = _state_off %}
+        {% elif current_power >= _power_value_running_lower %}
+          {% set next_state = _state_running %}
+        {% endif %}
+
+      {% elif current_state == _state_interrupted %}
+
+        {% if current_power < _power_value_idle_lower %}
+          {% set next_state = _state_off %}
+        {% elif current_power < _power_value_running_lower %}
+          {% set next_state = _state_on %}
         {% else %}
-          {% set next_state = state_running %}
+          {% set next_state = _state_running %}
         {% endif %}
       
       {% endif %}
